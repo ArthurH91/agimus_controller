@@ -23,7 +23,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from os.path import dirname, join, abspath
-
+from typing import Tuple
 import numpy as np
 import pinocchio as pin
 import hppfcl
@@ -45,7 +45,7 @@ class PandaWrapper:
         self,
         auto_col=False,
         capsule=False,
-    ):
+    )-> None:
         """Create a wrapper for the robot panda.
 
         Args:
@@ -71,7 +71,7 @@ class PandaWrapper:
         # Transforming the robot from cylinders/spheres to capsules
         self._capsule = capsule
 
-    def __call__(self):
+    def create_robot(self) ->Tuple[pin.Model, pin.GeometryModel, pin.VisualModel]:
         """Create a robot.
 
         Returns:

@@ -8,6 +8,7 @@ import mpc_utils
 import pin_utils
 from ocp import OCPPandaReachingColWithMultipleCol
 from wrapper_panda import PandaRobot
+from scenes import Scene
 
 np.set_printoptions(precision=4, linewidth=180)
 
@@ -16,9 +17,11 @@ class MPC:
     def __init__(
         self,
         robot_simulator: PandaRobot,
+        rmodel: pin.Model,
+        cmodel: pin.GeometryModel,
+        scene: Scene,
         OCP: OCPPandaReachingColWithMultipleCol,
         max_iter: int,
-        env: BulletEnvWithGround,
         TARGET_POSE_1: pin.SE3,
         TARGET_POSE_2: pin.SE3,
         T_sim: float,
@@ -29,7 +32,6 @@ class MPC:
             robot_simulator (PandaRobot): Wrapper of pinocchio and pybullet robot.
             OCP (OCPPandaReachingColWithMultipleCol): OCP solved in the MPC.
             max_iter (int): Number max of iterations of the solver.
-            env (BulletEnvWithGround): Pybullet environement.
             TARGET_POSE_1 (pin.SE3): First target of the robot.
             TARGET_POSE_2 (pin.SE3): Second target of the robot.
             T_sim (float): total time of the simulation.
@@ -38,9 +40,11 @@ class MPC:
         # Robot wrapper
         self._robot_simulator = robot_simulator
 
+        self._rmodel = rmodel
+        self._cmodel = cmodel
+    
         # Environement of the robot
-        self._env = env
-        self._scene = self._robot_simulator.scene
+        self._scene = scene
 
         # Setting up the OCP to be solved
         self._OCP = OCP
@@ -65,9 +69,9 @@ class MPC:
         self._ocp_params["N_h"] = self._T
         self._ocp_params["dt"] = self._dt
         self._ocp_params["maxiter"] = self._max_iter
-        self._ocp_params["pin_model"] = robot_simulator.pin_robot.model
+        self._ocp_params["pin_model"] = self._rmodel
         self._ocp_params["armature"] = self._OCP._runningModel.differential.armature
-        self._ocp_params["id_endeff"] = robot_simulator.pin_robot.model.getFrameId(
+        self._ocp_params["id_endeff"] = self._rmodel.getFrameId(
             "panda2_leftfinger"
         )
         self._ocp_params["active_costs"] = self._sqp.problem.runningModels[
@@ -200,7 +204,6 @@ class MPC:
 
                 # Send torque to simulator & step simulator
                 self._robot_simulator.send_joint_command(u_ref_SIM_RATE)
-                self._env.step()
                 # Measure new state from simulator
                 q_mea_SIM_RATE, v_mea_SIM_RATE = self._robot_simulator.get_state()
                 # Update pinocchio model
@@ -240,18 +243,18 @@ class MPC:
             for obstacle, shape in self._distances.items():
                 for shape_name, distance_between_shape_and_obstacle in shape.items():
                     id_shape = (
-                        self._robot_simulator.pin_robot.collision_model.getGeometryId(
+                        self._cmodel.getGeometryId(
                             shape_name
                         )
                     )
                     id_obstacle = (
-                        self._robot_simulator.pin_robot.collision_model.getGeometryId(
+                        self._cmodel.getGeometryId(
                             obstacle
                         )
                     )
                     dist = pin_utils.compute_distance_between_shapes(
-                        self._robot_simulator.pin_robot.model,
-                        self._robot_simulator.pin_robot.collision_model,
+                        self._rmodel,
+                        self._cmodel,
                         id_shape,
                         id_obstacle,
                         q[:7],

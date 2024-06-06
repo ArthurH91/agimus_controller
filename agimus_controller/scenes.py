@@ -1,5 +1,5 @@
 from os.path import dirname, join, abspath
-
+from typing import Tuple
 import numpy as np
 import pinocchio as pin
 
@@ -73,8 +73,8 @@ class Scene:
     def create_scene_from_urdf(
         self,
         rmodel: pin.Model,
-        cmodel: pin.Model,
-    ):
+        cmodel: pin.GeometryModel,
+    )-> Tuple[pin.Model, pin.GeometryModel, pin.SE3,  pin.SE3, np.ndarray]:
         """Create a scene amond the one described in the constructor of the class.
 
         Args:

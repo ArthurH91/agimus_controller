@@ -1,10 +1,7 @@
 import numpy as np
 
-import pybullet
-from mim_robots.pybullet.env import BulletEnvWithGround
-
 from agimus_controller.ocp import OCPPandaReachingColWithMultipleCol
-from agimus_controller.wrapper_panda import PandaRobot
+from agimus_controller.wrapper_panda import PandaWrapper
 from agimus_controller.scenes import Scene
 from agimus_controller.mpc import MPC
 
@@ -21,28 +18,16 @@ def main():
 
     # Creation of the scene
     scene = Scene(name_scene=name_scene)
-
-    # Simulation environment
-    env = BulletEnvWithGround(server=pybullet.GUI, dt=1e-3)
-    # Robot simulator
-    robot_simulator = PandaRobot(
-        capsule=True, auto_col=True, pos_obs=scene.obstacle_pose, name_scene=name_scene
-    )
-    TARGET_POSE1, TARGET_POSE2, q0 = (
-        robot_simulator.TARGET_POSE1,
-        robot_simulator.TARGET_POSE2,
-        robot_simulator.q0,
-    )
-    env.add_robot(robot_simulator)
+    
+    robotwrapper = PandaWrapper(capsule=True, auto_col=True)
+    rmodel, cmodel, vmodel = robotwrapper.create_robot()
+    rmodel, cmodel, TARGET_POSE1, TARGET_POSE2, q0 = scene.create_scene_from_urdf(rmodel, cmodel)
 
     # Extract robot model
-    nv = robot_simulator.pin_robot.model.nv
+    nv = rmodel.nv
     v0 = np.zeros(nv)
     x0 = np.concatenate([q0, v0])
-    # Add robot to simulation and initialize
-    robot_simulator.reset_state(q0, v0)
-    robot_simulator.forward_robot(q0, v0)
-
+    
     # Parameters of the OCP
     max_iter = 4  # Maximum iterations of the solver
     max_qp_iters = 25  # Maximum iterations for solving each qp solved in one iteration of the solver
@@ -62,8 +47,8 @@ def main():
 
     print("Solving the problem with collision")
     problem = OCPPandaReachingColWithMultipleCol(
-        robot_simulator.pin_robot.model,
-        robot_simulator.pin_robot.collision_model,
+        rmodel,
+        cmodel,
         TARGET_POSE1,
         T,
         dt,
@@ -80,7 +65,6 @@ def main():
         robot_simulator,
         OCP=problem,
         max_iter=max_iter,
-        env=env,
         TARGET_POSE_1=TARGET_POSE1,
         TARGET_POSE_2=TARGET_POSE2,
         T_sim=T_sim,
